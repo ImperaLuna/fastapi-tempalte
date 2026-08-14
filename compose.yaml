@@ -1,0 +1,38 @@
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      APP_DATABASE_URL: postgresql+asyncpg://app:app@db:5432/app
+    depends_on:
+      db:
+        condition: service_healthy
+    # Dev ergonomics: mount source and reload on change. The project is
+    # installed editable in the image, so the mounted src is what actually runs.
+    volumes:
+      - ./src:/app/src
+    command:
+      [
+        "uv", "run", "--no-dev", "uvicorn", "app.main:app",
+        "--host", "0.0.0.0", "--port", "8000", "--reload",
+      ]
+
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app
+      POSTGRES_DB: app
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app -d app"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+volumes:
+  pgdata:
