@@ -6,6 +6,8 @@ from alembic.migration import MigrationContext
 from sqlalchemy import Connection, inspect
 from sqlalchemy.ext.asyncio import create_async_engine
 
+import app.db.models  # noqa: F401  # register models on Base.metadata
+from app.db.autogen import include_object
 from app.db.base import Base
 
 if TYPE_CHECKING:
@@ -32,7 +34,11 @@ async def test_models_match_migrations(migrated_database: str) -> None:
     def diff_against_models(conn: Connection) -> list[object]:
         context = MigrationContext.configure(
             conn,
-            opts={"compare_type": True, "compare_server_default": True},
+            opts={
+                "compare_type": True,
+                "compare_server_default": True,
+                "include_object": include_object,
+            },
         )
         return compare_metadata(context, Base.metadata)
 

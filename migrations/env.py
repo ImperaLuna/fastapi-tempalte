@@ -7,6 +7,7 @@ from sqlalchemy import pool
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from app.config import get_settings
+from app.db.autogen import include_object
 from app.db.base import Base
 
 if TYPE_CHECKING:
@@ -25,9 +26,10 @@ if config.config_file_name is not None:
 # one source of truth, and no credentials committed to the repo.
 config.set_main_option("sqlalchemy.url", get_settings().database_url)
 
-# Import model modules here so their tables register on Base.metadata
-# before autogenerate diffs it against the live database, e.g.:
-# import app.db.models
+# Model modules must be imported so their tables register on Base.metadata
+# before autogenerate diffs it against the live database.
+import app.db.models  # noqa: F401, E402
+
 target_metadata = Base.metadata
 
 
@@ -49,6 +51,7 @@ def run_migrations_offline() -> None:
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
+        include_object=include_object,
     )
 
     with context.begin_transaction():
@@ -61,6 +64,7 @@ def do_run_migrations(connection: Connection) -> None:
         target_metadata=target_metadata,
         compare_type=True,
         compare_server_default=True,
+        include_object=include_object,
     )
 
     with context.begin_transaction():
