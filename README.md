@@ -67,6 +67,23 @@ uv run ruff format .
 uv run ty check
 ```
 
+## Migrations (Alembic)
+
+```bash
+# Generate a migration from model changes (review the file before applying!)
+uv run alembic revision --autogenerate -m "describe the change"
+
+# Apply all pending migrations
+uv run alembic upgrade head
+
+# Roll back one migration
+uv run alembic downgrade -1
+
+# Show current DB revision / history
+uv run alembic current
+uv run alembic history
+```
+
 ## Dependency management
 
 ```bash
