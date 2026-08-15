@@ -54,7 +54,8 @@ uv run uvicorn app.main:app --reload
 ## Checks
 
 ```bash
-# Tests
+# Tests — DB-backed tests need Postgres up (docker compose up -d db);
+# they create and drop a dedicated app_test database, and skip if Postgres is down
 uv run pytest
 
 # Lint (add --fix to autofix)
