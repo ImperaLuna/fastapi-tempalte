@@ -10,12 +10,15 @@ from alembic.config import Config
 from sqlalchemy import text
 from sqlalchemy.engine import make_url
 from sqlalchemy.exc import DBAPIError
-from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app.config import get_settings
+from app.db.session import build_engine
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import AsyncIterator, Iterator
+
+    from sqlalchemy.ext.asyncio import AsyncSession
 
 REPO_ROOT = Path(__file__).parent.parent
 
@@ -40,7 +43,7 @@ def _database(name: str) -> Iterator[str]:
 
     try:
         asyncio.run(_execute_admin(admin_url, f'DROP DATABASE IF EXISTS "{name}"'))
-    except (OSError, DBAPIError):
+    except OSError, DBAPIError:
         pytest.skip("Postgres unavailable — start it with `docker compose up -d db`")
 
     asyncio.run(_execute_admin(admin_url, f'CREATE DATABASE "{name}"'))
@@ -95,3 +98,28 @@ def fresh_database_url() -> Iterator[str]:
     """
     with _database("app_test_fresh") as url, _settings_pointing_at(url):
         yield url
+
+
+@pytest.fixture
+async def db_session(migrated_database: str) -> AsyncIterator[AsyncSession]:
+    """A session inside a transaction that is rolled back after the test.
+
+    The session binds to a single connection whose outer transaction never
+    commits — everything the test writes vanishes on rollback, so tests can't
+    leak state into each other. join_transaction_mode="create_savepoint"
+    turns session.commit() inside a test into a SAVEPOINT release, so code
+    under test may commit freely while the outer rollback still wins.
+    """
+    engine = build_engine(migrated_database)
+    try:
+        async with engine.connect() as conn, conn.begin() as outer:
+            factory = async_sessionmaker(
+                conn,
+                expire_on_commit=False,
+                join_transaction_mode="create_savepoint",
+            )
+            async with factory() as session:
+                yield session
+            await outer.rollback()
+    finally:
+        await engine.dispose()
